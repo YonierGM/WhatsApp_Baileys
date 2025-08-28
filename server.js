@@ -22,8 +22,8 @@ app.use(bodyParser.json());
 let sock;
 let qrImageBase64 = null;
 
-// 📦 Asegurar tabla y guardar credenciales
-async function saveCreds(creds, keys) {
+// Asegurar tabla
+async function ensureTableExists() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_auth (
       id INT PRIMARY KEY,
@@ -31,7 +31,11 @@ async function saveCreds(creds, keys) {
       keys JSONB NOT NULL
     )
   `);
+}
 
+// Guardar credenciales en la base de datos
+async function saveCreds(creds, keys) {
+  await ensureTableExists();
   await pool.query(
     `INSERT INTO whatsapp_auth (id, creds, keys) 
      VALUES (1, $1, $2) 
@@ -41,8 +45,9 @@ async function saveCreds(creds, keys) {
   );
 }
 
-// 📦 Cargar credenciales desde la base de datos
+// Cargar credenciales desde la base de datos
 async function loadCreds() {
+  await ensureTableExists();
   const res = await pool.query(`SELECT creds, keys FROM whatsapp_auth WHERE id = 1`);
   if (res.rows.length) {
     return {
