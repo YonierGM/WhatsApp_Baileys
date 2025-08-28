@@ -2,17 +2,18 @@ import express from "express";
 import bodyParser from "body-parser";
 import * as baileys from "@whiskeysockets/baileys";
 import axios from "axios";
-import qrcode from "qrcode-terminal";
+import qrcode from "qrcode";
 import dotenv from "dotenv";
 
-dotenv.config(); // Cargar variables de entorno
+dotenv.config();
 
 const { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } = baileys;
 
 const app = express();
 app.use(bodyParser.json());
 
-let sock; // guardamos el socket aquí para usarlo en el endpoint
+let sock;
+let qrImageBase64 = null; // guardaremos aquí el QR como imagen
 
 async function start() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth_info");
@@ -25,16 +26,18 @@ async function start() {
     browser: ["Vibras Store", "Chrome", "121.0.0.0"]
   });
 
-  sock.ev.on("connection.update", (update) => {
+  sock.ev.on("connection.update", async (update) => {
     const { qr, connection, lastDisconnect } = update;
 
     if (qr) {
-      console.log("📲 Escanea este QR:");
-      qrcode.generate(qr, { small: true });
+      // Generar imagen en Base64 para mostrar en navegador
+      qrImageBase64 = await qrcode.toDataURL(qr);
+      console.log(`📲 QR generado. Visita http://localhost:${process.env.PORT || 3000}/qr para escanear.`);
     }
 
     if (connection === "open") {
       console.log("✅ Conectado a WhatsApp");
+      qrImageBase64 = null; // limpiar QR después de conectar
     }
 
     if (connection === "close") {
@@ -50,7 +53,6 @@ async function start() {
 
   sock.ev.on("creds.update", saveCreds);
 
-  // 📩 Recibir mensajes y enviarlos a n8n
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     if (!msg.message || msg.key.fromMe) return;
@@ -65,7 +67,6 @@ async function start() {
 
     try {
       const resp = await axios.post(process.env.WEBHOOK_URL, { from, text });
-
       const reply = resp.data?.reply;
       if (reply) {
         await sock.sendMessage(from, { text: reply });
@@ -87,14 +88,20 @@ app.post("/sendMessage", async (req, res) => {
 
     await sock.sendMessage(chatId, { text: message });
     res.json({ status: "success", sent: message });
-
   } catch (error) {
     console.error("Error enviando mensaje:", error);
     res.status(500).json({ error: "No se pudo enviar el mensaje" });
   }
 });
 
-// 🚀 Iniciar servidor Express y Baileys
+// Endpoint para ver el QR
+app.get("/qr", (req, res) => {
+  if (!qrImageBase64) {
+    return res.send("QR no generado aún o ya estás conectado.");
+  }
+  res.send(`<img src="${qrImageBase64}" />`);
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor HTTP escuchando en http://localhost:${PORT}`);
