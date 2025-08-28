@@ -6,6 +6,7 @@ Está diseñado para integrarse fácilmente con **n8n** u otras plataformas de a
 ---
 
 ## 🚀 Características
+
 - Envío de mensajes de texto a usuarios de WhatsApp.
 - Integración directa con flujos de **n8n** usando nodos HTTP Request.
 - Fácil configuración y despliegue.
@@ -13,10 +14,10 @@ Está diseñado para integrarse fácilmente con **n8n** u otras plataformas de a
 
 ---
 
-
 ---
 
 ## ⚙️ Requisitos Previos
+
 - **Node.js** v18 o superior
 - **npm** o **yarn**
 - Una sesión activa de **Baileys** para WhatsApp
@@ -25,18 +26,26 @@ Está diseñado para integrarse fácilmente con **n8n** u otras plataformas de a
 ---
 
 ## 📦 Instalación
+
 1. Clonar el repositorio:
    ```bash
    git clone https://github.com/YonierGM/WhatsApp_Baileys
    cd WhatsApp_Baileys
+   ```
+
 ---
 
 2. Instalar dependencias:
    ```bash
    npm install
+   ```
+
 ---
-   
+
 3. Configurar el archivo .env
-  ```bash
-   WEBHOOK_URL=tu_webhook_aqui
-   PORT=3000
+
+```bash
+ WEBHOOK_URL=tu_webhook_aqui
+ DATABASE_URL=tu_databaseurl_aqui
+ PORT=3000
+```
