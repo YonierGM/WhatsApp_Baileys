@@ -1,0 +1,7 @@
+# modulos
+node_modules/
+# archivos de entorno
+.env
+# datos de baileys
+baileys_auth_info.json
+auth_info/
