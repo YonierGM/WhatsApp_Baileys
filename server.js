@@ -45,20 +45,21 @@ let isConnected = false;
 
 // Funciones para serializar/deserializar con soporte para Buffer
 function serialize(data) {
-  return JSON.stringify(data, (_, value) => {
+  return JSON.stringify(data, (key, value) => {
     if (value instanceof Buffer) {
       return {
-        type: 'Buffer',
+        __type: 'Buffer',
         data: Array.from(value)
       };
     }
+    // Manejar otros tipos especiales si es necesario
     return value;
   });
 }
 
 function deserialize(str) {
-  return JSON.parse(str, (_, value) => {
-    if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
+  return JSON.parse(str, (key, value) => {
+    if (value && typeof value === 'object' && value.__type === 'Buffer' && Array.isArray(value.data)) {
       return Buffer.from(value.data);
     }
     return value;
@@ -86,6 +87,8 @@ async function usePostgresAuthState() {
         }
       } catch (parseError) {
         console.error(`Error parsing data for key ${row.key}:`, parseError);
+        // Si falla la deserialización, eliminar la clave corrupta
+        await pool.query('DELETE FROM whatsapp_auth WHERE key = $1', [row.key]);
       }
     }
   } catch (error) {
@@ -111,7 +114,20 @@ async function usePostgresAuthState() {
       keys: {
         get: (type, ids) => {
           const key = `${type}-${ids.join(',')}`;
-          return keys[key] || undefined;
+          const value = keys[key];
+          
+          // Para sesiones, asegurarse de que tengan la estructura correcta
+          if (type === 'session' && value && typeof value === 'object') {
+            // Si la sesión no tiene la estructura esperada, intentar repararla
+            if (!value.session && value.registrationId !== undefined) {
+              console.log(`Reparando estructura de sesión para key ${key}`);
+              return {
+                session: value
+              };
+            }
+          }
+          
+          return value || undefined;
         },
         set: (data) => {
           const promises = [];
@@ -170,6 +186,9 @@ async function connectToWhatsApp() {
         isConnected = true;
         qrCode = null;
         console.log("✅ Conectado a WhatsApp");
+        
+        // Forzar guardado de credenciales tras conexión exitosa
+        await saveCreds();
       }
 
       if (connection === "close") {
@@ -273,6 +292,15 @@ app.post("/sendMessage", async (req, res) => {
     console.error("Error enviando mensaje:", error);
     res.status(500).json({ error: "No se pudo enviar el mensaje" });
   }
+});
+
+// Health check endpoint para mantener la instancia activa
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    connected: isConnected,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // 🚀 Iniciar servidor Express y Baileys
